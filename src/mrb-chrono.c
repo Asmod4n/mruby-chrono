@@ -1,5 +1,7 @@
 #include <mruby.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #if _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK)
 #include <time.h>
@@ -11,7 +13,7 @@ mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 
   clock_gettime(CLOCK_MONOTONIC, &ts);
 
-  return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0)));
+  return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
 }
 
 #elif defined(__MACH__)
@@ -42,13 +44,13 @@ mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
     assert (freq.QuadPart != 0);
-    frequency = freq.QuadPart / 1000.0;
+    frequency = (mrb_float) freq.QuadPart;
   }
 
   LARGE_INTEGER count;
   QueryPerformanceCounter(&count);
 
-  return mrb_float_value(mrb, cound.QuadPart / frequency);
+  return mrb_float_value(mrb, count.QuadPart / frequency);
 }
 
 #else
@@ -67,9 +69,9 @@ mrb_chrono_system_now(mrb_state *mrb, mrb_value self)
   GetSystemTimeAsFileTime(&ft);
 
   ULARGE_INTEGER dateTime;
-  memcpy(&dateTime, ft, sizeof(dateTime));
+  memcpy(&dateTime, &ft, sizeof(dateTime));
 
-  return mrb_float_value(mrb, dateTime.QuadPart / 10000.0);
+  return mrb_float_value(mrb, dateTime.QuadPart / 10000000.0);
 #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
