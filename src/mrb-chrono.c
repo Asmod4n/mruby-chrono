@@ -32,6 +32,7 @@ mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 }
 
 #elif defined(_MSC_VER)
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <assert.h>
 
