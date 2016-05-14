@@ -8,7 +8,7 @@ MRuby::Gem::Specification.new('mruby-chrono') do |spec|
 
   if RbConfig::CONFIG['target_os'] == 'linux'
     unless have_library("c", "clock_gettime")
-      spec.linker.libraries << 'rt'
+      #spec.linker.libraries << 'rt'
     end
   end
 end
