@@ -1,3 +1,4 @@
+/mruby/
 *.gem
 *.rbc
 /.config

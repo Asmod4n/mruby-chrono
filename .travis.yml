@@ -5,6 +5,7 @@ addons:
       - rake
       - bison
       - git
+      - ruby-dev
 language: c
 compiler:
   - gcc
