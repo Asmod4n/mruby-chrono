@@ -32,6 +32,7 @@ mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 }
 
 #elif defined(_MSC_VER)
+#define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <assert.h>
@@ -73,6 +74,12 @@ mrb_chrono_system_now(mrb_state *mrb, mrb_value self)
   memcpy(&dateTime, &ft, sizeof(dateTime));
 
   return mrb_float_value(mrb, dateTime.QuadPart / 10000000.0);
+#elif _POSIX_TIMERS > 0
+  struct timespec ts;
+
+  clock_gettime(CLOCK_REALTIME, &ts);
+
+  return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
 #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
