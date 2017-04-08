@@ -28,7 +28,7 @@ static void __attribute__((constructor)) sTimebaseInfo_init()
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 {
-  return mrb_float_value(mrb, mach_absolute_time() * sTimebaseInfo.numer / sTimebaseInfo.denom / 1000000000.0);
+  return mrb_float_value(mrb, (mach_absolute_time() * sTimebaseInfo.numer / sTimebaseInfo.denom) / 1000000000.0);
 }
 
 #elif defined(_MSC_VER)
