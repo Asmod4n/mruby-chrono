@@ -1,16 +1,20 @@
 #include <mruby.h>
+#ifdef MRB_USE_FLOAT
+#error "MRB_USE_FLOAT is too small for mruby-chrono"
+#endif
 #ifndef _MSC_VER
 #include <unistd.h>
 #endif
 
-#if _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK)
+#ifdef HAVE_TIME_H
 #include <time.h>
+#endif
 
+#ifdef CLOCK_MONOTONIC
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 {
   struct timespec ts;
-
   clock_gettime(CLOCK_MONOTONIC, &ts);
 
   return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
@@ -28,7 +32,7 @@ static void __attribute__((constructor)) sTimebaseInfo_init()
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 {
-  return mrb_float_value(mrb, (mach_absolute_time() * sTimebaseInfo.numer / sTimebaseInfo.denom) / 1000000000.0);
+  return mrb_float_value(mrb, (mach_absolute_time() / sTimebaseInfo.denom * sTimebaseInfo.numer) / 1000000000.0);
 }
 
 #elif defined(_MSC_VER)
@@ -74,9 +78,8 @@ mrb_chrono_system_now(mrb_state *mrb, mrb_value self)
   memcpy(&dateTime, &ft, sizeof(dateTime));
 
   return mrb_float_value(mrb, dateTime.QuadPart / 10000000.0);
-#elif _POSIX_TIMERS > 0
+#elif defined(CLOCK_REALTIME)
   struct timespec ts;
-
   clock_gettime(CLOCK_REALTIME, &ts);
 
   return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
