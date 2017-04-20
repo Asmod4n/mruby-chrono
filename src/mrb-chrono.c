@@ -10,12 +10,20 @@
 #include <time.h>
 #endif
 
-#ifdef CLOCK_MONOTONIC
+#ifdef CLOCK_UPTIME_RAW
+  #define MRB_CHRONO_MONOTONIC CLOCK_UPTIME_RAW
+#elif defined(CLOCK_MONOTONIC_RAW)
+  #define MRB_CHRONO_MONOTONIC CLOCK_MONOTONIC_RAW
+#elif defined(CLOCK_MONOTONIC)
+  #define MRB_CHRONO_MONOTONIC CLOCK_MONOTONIC
+#endif
+
+#ifdef MRB_CHRONO_MONOTONIC
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 {
   struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
+  clock_gettime(MRB_CHRONO_MONOTONIC, &ts);
 
   return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
 }
