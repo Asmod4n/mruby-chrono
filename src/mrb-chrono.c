@@ -2,78 +2,18 @@
 #ifdef MRB_USE_FLOAT
 #error "MRB_USE_FLOAT is too small for mruby-chrono"
 #endif
-#ifndef _MSC_VER
-#include <unistd.h>
-#endif
-
-#ifdef HAVE_TIME_H
-#include <time.h>
-#endif
-
-#ifdef CLOCK_UPTIME_RAW
-  #define MRB_CHRONO_MONOTONIC CLOCK_UPTIME_RAW
-#elif defined(CLOCK_MONOTONIC_RAW)
-  #define MRB_CHRONO_MONOTONIC CLOCK_MONOTONIC_RAW
-#elif defined(CLOCK_MONOTONIC)
-  #define MRB_CHRONO_MONOTONIC CLOCK_MONOTONIC
-#endif
-
-#ifdef MRB_CHRONO_MONOTONIC
-static mrb_value
-mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
-{
-  struct timespec ts;
-  clock_gettime(MRB_CHRONO_MONOTONIC, &ts);
-
-  return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
-}
-
-#elif defined(__MACH__)
-#include <mach/mach_time.h>
-
-static mach_timebase_info_data_t sTimebaseInfo;
-static void __attribute__((constructor)) sTimebaseInfo_init()
-{
-  mach_timebase_info(&sTimebaseInfo);
-}
+#include <mruby/error.h>
+#include "getRealTime.h"
 
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 {
-  return mrb_float_value(mrb, (mach_absolute_time() / sTimebaseInfo.denom * sTimebaseInfo.numer) / 1000000000.0);
-}
-
-#elif defined(_MSC_VER)
-#define VC_EXTRALEAN
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <assert.h>
-
-static mrb_value
-mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
-{
-  static mrb_float frequency = 0.0;
-
-  if (frequency == 0.0) {
-    LARGE_INTEGER freq;
-    QueryPerformanceFrequency(&freq);
-    assert (freq.QuadPart != 0);
-    frequency = (mrb_float) freq.QuadPart;
+  mrb_float realtime = getRealTime();
+  if (realtime == -1.0) {
+    mrb_sys_fail(mrb, "getRealTime");
   }
-
-  LARGE_INTEGER count;
-  QueryPerformanceCounter(&count);
-
-  return mrb_float_value(mrb, count.QuadPart / frequency);
+  return mrb_float_value(mrb, realtime);
 }
-
-#else
-#error "cannot find a monotonic time clock"
-#endif
-
-#ifndef _MSC_VER
-#include <sys/time.h>
-#endif
 
 static mrb_value
 mrb_chrono_system_now(mrb_state *mrb, mrb_value self)

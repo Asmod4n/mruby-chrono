@@ -10,9 +10,11 @@ MRuby::Gem::Specification.new('mruby-chrono') do |spec|
     spec.cc.defines << 'HAVE_TIME_H'
   end
 
-  if build.kind_of?(MRuby::CrossBuild) && %w(x86_64-pc-linux-gnu i686-pc-linux-gnu).include?(build.host_target)
-    spec.linker.libraries << 'rt'
-  elsif RbConfig::CONFIG['target_os'] == 'linux'
+  if build.kind_of?(MRuby::CrossBuild)
+    unless (build.host_target.include?('darwin')||build.host_target.include?('mingw'))
+      spec.linker.libraries << 'rt'
+    end
+  elsif !(RbConfig::CONFIG['target_os'].include?('darwin')||RbConfig::CONFIG['target_os'].include?('mingw'))
     unless have_library("c", "clock_gettime")
       spec.linker.libraries << 'rt'
     end
