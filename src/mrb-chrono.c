@@ -5,11 +5,19 @@
 #include <mruby/error.h>
 #include "getRealTime.h"
 
+#if (__GNUC__ >= 3) || (__INTEL_COMPILER >= 800) || defined(__clang__)
+# define likely(x) __builtin_expect(!!(x), 1)
+# define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+# define likely(x) (x)
+# define unlikely(x) (x)
+#endif
+
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 {
   mrb_float realtime = getRealTime();
-  if (realtime == -1.0) {
+  if (unlikely(realtime == -1.0)) {
     mrb_sys_fail(mrb, "getRealTime");
   }
   return mrb_float_value(mrb, realtime);
@@ -18,24 +26,27 @@ mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_chrono_system_now(mrb_state *mrb, mrb_value self)
 {
-#ifdef _MSC_VER
+#ifdef _WIN32
   FILETIME ft;
+  ULONGLONG dateTime;
+#if defined(NTDDI_WIN8) && NTDDI_VERSION >= NTDDI_WIN8
+  GetSystemTimePreciseAsFileTime(&ft);
+#else
   GetSystemTimeAsFileTime(&ft);
+#endif
+  dateTime = ((ULONGLONG) ft.dwHighDateTime << 32)|(ULONGLONG) ft.dwLowDateTime;
 
-  ULARGE_INTEGER dateTime;
-  memcpy(&dateTime, &ft, sizeof(dateTime));
-
-  return mrb_float_value(mrb, dateTime.QuadPart / 10000000.0);
+  return mrb_float_value(mrb, (mrb_float) dateTime / 10000000.0);
 #elif defined(CLOCK_REALTIME)
   struct timespec ts;
   clock_gettime(CLOCK_REALTIME, &ts);
 
-  return mrb_float_value(mrb, ts.tv_sec + (ts.tv_nsec / 1000000000.0));
+  return mrb_float_value(mrb, (mrb_float) ts.tv_sec + (mrb_float) ((mrb_float) ts.tv_nsec / (mrb_float)NSEC_PER_SEC));
 #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
 
-  return mrb_float_value(mrb, tv.tv_sec + (tv.tv_usec / 1000000.0));
+  return mrb_float_value(mrb, (mrb_float) tv.tv_sec + (mrb_float) ((mrb_float) tv.tv_usec / (mrb_float)USEC_PER_SEC));
 #endif
 }
 
