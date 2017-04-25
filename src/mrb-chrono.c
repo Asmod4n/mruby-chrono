@@ -3,7 +3,6 @@
 #error "MRB_USE_FLOAT is too small for mruby-chrono"
 #endif
 #include <mruby/error.h>
-#include "getRealTime.h"
 
 #if (__GNUC__ >= 3) || (__INTEL_COMPILER >= 800) || defined(__clang__)
 # define likely(x) __builtin_expect(!!(x), 1)
@@ -12,6 +11,8 @@
 # define likely(x) (x)
 # define unlikely(x) (x)
 #endif
+
+#include "getRealTime.h"
 
 static mrb_value
 mrb_chrono_steady_now(mrb_state *mrb, mrb_value self)
