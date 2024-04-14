@@ -41,17 +41,17 @@ mrb_chrono_system_now(mrb_state *mrb, mrb_value self)
 #endif
   dateTime = ((ULONGLONG) ft.dwHighDateTime << 32)|(ULONGLONG) ft.dwLowDateTime;
 
-  return mrb_float_value(mrb, (mrb_float) dateTime / 10000000.0);
+  return mrb_float_value(mrb, (mrb_float) ((mrb_float) dateTime / 10000000.0));
 #elif defined(CLOCK_REALTIME)
   struct timespec ts;
   clock_gettime(CLOCK_REALTIME, &ts);
 
-  return mrb_float_value(mrb, (mrb_float) ts.tv_sec + (mrb_float) ((mrb_float) ts.tv_nsec / (mrb_float)NSEC_PER_SEC));
+  return mrb_float_value(mrb, (mrb_float) ts.tv_sec + ((mrb_float) ts.tv_nsec / (mrb_float) NSEC_PER_SEC));
 #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
 
-  return mrb_float_value(mrb, (mrb_float) tv.tv_sec + (mrb_float) ((mrb_float) tv.tv_usec / (mrb_float)USEC_PER_SEC));
+  return mrb_float_value(mrb, (mrb_float) tv.tv_sec + ((mrb_float) tv.tv_usec / (mrb_float) USEC_PER_SEC));
 #endif
 }
 
@@ -60,6 +60,8 @@ mrb_mruby_chrono_gem_init(mrb_state* mrb)
 {
   struct RClass *chrono_mod, *steady_mod, *system_mod;
   chrono_mod = mrb_define_module(mrb, "Chrono");
+  mrb_define_module_function(mrb, chrono_mod, "steady", mrb_chrono_steady_now, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, chrono_mod, "system", mrb_chrono_system_now, MRB_ARGS_NONE());
 
   steady_mod = mrb_define_module_under(mrb, chrono_mod, "Steady");
   mrb_define_module_function(mrb, steady_mod, "now", mrb_chrono_steady_now, MRB_ARGS_NONE());

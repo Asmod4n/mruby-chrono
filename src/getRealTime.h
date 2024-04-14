@@ -6,7 +6,9 @@
  *
  * Changes by Hendrik Beskow: change tab so spaces, remove all wall clocks, fill timeConvert at library load on macOS
  */
+#define _XOPEN_SOURCE 700
 #include <errno.h>
+
 #ifdef _WIN32
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
@@ -16,26 +18,29 @@
 #include <unistd.h> /* POSIX flags */
 #include <time.h> /* clock_gettime(), time() */
 #include <sys/time.h> /* gethrtime(), gettimeofday() */
-  #if defined(__MACH__) && defined(__APPLE__)
-  #include <mach/mach_time.h>
-  #include <assert.h>
-    static mrb_float timeConvert;
-    static void __attribute__((constructor)) sTimebaseInfo_init()
-    {
-      mach_timebase_info_data_t timeBase;
-      mach_timebase_info(&timeBase);
-      assert(timeBase.denom != 0 && timeBase.numer != 0);
-      timeConvert = (mrb_float)timeBase.numer /
-        (mrb_float)timeBase.denom /
-        (mrb_float)NSEC_PER_SEC;
-    }
-  #endif
 #else
 #error "Unable to define getRealTime( ) for an unknown OS."
 #endif
+
 #ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC 1000000000UL
 #endif
+
+#if defined(__MACH__) && defined(__APPLE__)
+#include <mach/mach_time.h>
+#include <assert.h>
+  static mrb_float timeConvert;
+  static void __attribute__((constructor)) sTimebaseInfo_init()
+  {
+    mach_timebase_info_data_t timeBase;
+    mach_timebase_info(&timeBase);
+    assert(timeBase.denom != 0 && timeBase.numer != 0);
+    timeConvert = (mrb_float)timeBase.numer /
+      (mrb_float)timeBase.denom /
+      (mrb_float)NSEC_PER_SEC;
+  }
+#endif
+
 /**
  * Returns the real time, in seconds, or -1.0 if an error occurred.
  *
@@ -64,7 +69,7 @@ mrb_float getRealTime()
   return (mrb_float) gethrtime() / (mrb_float) NSEC_PER_SEC;
 
 #elif defined(__MACH__) && defined(__APPLE__)
-  /* OSX. ----------------------------------------------------- */
+  /* macOS. ----------------------------------------------------- */
   return (mrb_float) mach_absolute_time() * timeConvert;
 
 #elif defined(_POSIX_VERSION) && defined(_POSIX_TIMERS) && (_POSIX_TIMERS > 0)
