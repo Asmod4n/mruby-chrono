@@ -46,7 +46,7 @@ mrb_chrono_system_now(mrb_state *mrb, mrb_value self)
   struct timespec ts;
   clock_gettime(CLOCK_REALTIME, &ts);
 
-  return (mrb_float) ts.tv_sec + (mrb_float) ((mrb_float) ts.tv_nsec / (mrb_float)NSEC_PER_SEC));
+  return mrb_float_value(mrb, (mrb_float) ts.tv_sec + (mrb_float) ((mrb_float) ts.tv_nsec / (mrb_float)NSEC_PER_SEC));
 #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
