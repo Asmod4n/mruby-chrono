@@ -34,7 +34,7 @@
 #error "Unable to define getRealTime( ) for an unknown OS."
 #endif
 #ifndef NSEC_PER_SEC
-#define NSEC_PER_SEC 1000000000L
+#define NSEC_PER_SEC 1000000000UL
 #endif
 /**
  * Returns the real time, in seconds, or -1.0 if an error occurred.
@@ -86,7 +86,7 @@ mrb_float getRealTime()
     const clockid_t id = (clockid_t)-1; /* Unknown. */
   #endif /* CLOCKS * */
   if (id != (clockid_t) -1 && clock_gettime(id, &ts) != -1) {
-    return (mrb_float) ts.tv_sec + (mrb_float) ts.tv_nsec / (mrb_float) NSEC_PER_SEC;
+    return (mrb_float) ts.tv_sec + ((mrb_float) ts.tv_nsec / (mrb_float) NSEC_PER_SEC);
   }
 #endif
 
