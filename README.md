@@ -13,4 +13,5 @@ Chrono::System.now or Chrono.system # returns the current System Time
 ```
 
 The return values are Ruby Floats.
-This suports HP-UX, Solaris, macOS, BSD, Linux, AIX, POSIX and Windows.
+
+You need a c++11 compatible c++ compiler.
