@@ -3,6 +3,5 @@ MRuby::Build.new do |conf|
   enable_debug
   conf.enable_test
   conf.gembox 'full-core'
-  conf.gem '../mruby-c-ext-helpers'
   conf.gem File.expand_path(File.dirname(__FILE__))
 end

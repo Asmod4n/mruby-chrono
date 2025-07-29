@@ -43,19 +43,12 @@ struct Timer {
   }
 };
 
-static void
-timer_free(mrb_state *mrb, void *ptr)
-{
-  Timer* t = static_cast<Timer*>(ptr);
-  mrb_cpp_delete(mrb, t);
-}
-
-static const struct mrb_data_type timer_type = { "Chrono::Timer", timer_free };
+MRB_CPP_DEFINE_TYPE(Timer)
 
 static mrb_value
 timer_init(mrb_state* mrb, mrb_value self)
 {
-  mrb_cpp_new<Timer>(mrb, self, &timer_type);
+  mrb_cpp_new<Timer>(mrb, self);
 
   return self;
 }
