@@ -43,7 +43,7 @@ struct Timer {
   }
 };
 
-MRB_CPP_DEFINE_TYPE(Timer)
+MRB_CPP_DEFINE_TYPE(Timer, Timer)
 
 static mrb_value
 timer_init(mrb_state* mrb, mrb_value self)
