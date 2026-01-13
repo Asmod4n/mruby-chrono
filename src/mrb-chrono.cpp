@@ -11,6 +11,7 @@
 #include <mruby/cpp_helpers.hpp>
 #include <mruby/branch_pred.h>
 #include <new>
+#include <mruby/presym.h>
 
 using namespace std::chrono;
 
@@ -77,21 +78,21 @@ void
 mrb_mruby_chrono_gem_init(mrb_state* mrb)
 {
   struct RClass *chrono_mod, *steady_mod, *system_mod;
-  chrono_mod = mrb_define_module(mrb, "Chrono");
-  mrb_define_module_function(mrb, chrono_mod, "steady", mrb_chrono_steady_now, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, chrono_mod, "system", mrb_chrono_system_now, MRB_ARGS_NONE());
+  chrono_mod = mrb_define_module_id(mrb, MRB_SYM(Chrono));
+  mrb_define_module_function_id(mrb, chrono_mod, MRB_SYM(steady), mrb_chrono_steady_now, MRB_ARGS_NONE());
+  mrb_define_module_function_id(mrb, chrono_mod, MRB_SYM(system), mrb_chrono_system_now, MRB_ARGS_NONE());
 
-  steady_mod = mrb_define_module_under(mrb, chrono_mod, "Steady");
-  mrb_define_module_function(mrb, steady_mod, "now", mrb_chrono_steady_now, MRB_ARGS_NONE());
+  steady_mod = mrb_define_module_under_id(mrb, chrono_mod, MRB_SYM(Steady));
+  mrb_define_module_function_id(mrb, steady_mod, MRB_SYM(now), mrb_chrono_steady_now, MRB_ARGS_NONE());
 
-  system_mod = mrb_define_module_under(mrb, chrono_mod, "System");
-  mrb_define_module_function(mrb, system_mod, "now", mrb_chrono_system_now, MRB_ARGS_NONE());
+  system_mod = mrb_define_module_under_id(mrb, chrono_mod, MRB_SYM(System));
+  mrb_define_module_function_id(mrb, system_mod, MRB_SYM(now), mrb_chrono_system_now, MRB_ARGS_NONE());
 
-  struct RClass* timer_cls = mrb_define_class_under(mrb, chrono_mod, "Timer", mrb->object_class);
+  struct RClass* timer_cls = mrb_define_class_under_id(mrb, chrono_mod, MRB_SYM(Timer), mrb->object_class);
   MRB_SET_INSTANCE_TT(timer_cls, MRB_TT_DATA);
-  mrb_define_method(mrb, timer_cls, "initialize", timer_init, MRB_ARGS_NONE());
-  mrb_define_method(mrb, timer_cls, "reset", timer_reset, MRB_ARGS_NONE());
-  mrb_define_method(mrb, timer_cls, "elapsed", timer_elapsed, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, timer_cls, MRB_SYM(initialize), timer_init, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, timer_cls, MRB_SYM(reset), timer_reset, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, timer_cls, MRB_SYM(elapsed), timer_elapsed, MRB_ARGS_NONE());
 }
 
 void mrb_mruby_chrono_gem_final(mrb_state* mrb) {}
