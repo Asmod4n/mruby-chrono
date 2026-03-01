@@ -3,4 +3,9 @@ MRuby::Gem::Specification.new('mruby-chrono') do |spec|
   spec.author  = 'Hendrik Beskow'
   spec.summary = 'A Time library for mruby'
   spec.add_dependency 'mruby-c-ext-helpers'
+  if spec.for_windows?
+    spec.cxx.flags << '/std:c++17'
+  else
+    spec.cxx.flags << '-std=c++17'
+  end
 end
