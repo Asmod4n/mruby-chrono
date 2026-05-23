@@ -21,9 +21,11 @@
  * gem just routes through. The gem doesn't synthesize types the
  * standard doesn't have.
  *
- * Storage internally is `struct timespec` in the mruby data slot.
- * That's an implementation detail; the C++ API is in terms of
- * std::chrono types.
+ * Storage internally is std::chrono::nanoseconds — the same type that
+ * std::chrono::system_clock::duration and ::steady_clock::duration
+ * already are on libstdc++ and libc++. Representable range is ±2^63 ns
+ * ≈ ±292 years. The internal type is exposed as mrb_chrono::Duration
+ * for callers that want to construct or read it directly.
  */
 
 #pragma once
@@ -32,10 +34,17 @@
 #include <mruby/data.h>
 #include <chrono>
 #include <cstdint>
-#include <ctime>
+#include <ctime>      /* struct timespec for to_timespec */
 #include <type_traits>
 
 namespace mrb_chrono {
+
+/* The std::chrono type used as internal storage for Chrono::Duration.
+ * Exposed for extension code that wants to construct or extract
+ * directly via from_nanoseconds / stored_nanoseconds without going
+ * through the templated from<T> / as<T> dispatch. */
+using Duration = std::chrono::nanoseconds;
+
 
 /* ----- Rounding policies --------------------------------------------
  *
@@ -66,47 +75,51 @@ namespace detail {
 }
 
 
-/* ----- Duration data type and accessor ------------------------------
+/* ----- Direct access to internal storage ----------------------------
  *
- * The Chrono::Duration mruby object holds a `struct timespec` in its
- * data slot. C++ extension code unwraps it via duration_to_timespec
- * below — the typed accessor type-checks and returns the timespec by
- * value. The mrb_data_type itself is TU-local in mrb-chrono.cpp;
- * external code reaches the timespec only through this function.
- */
-struct timespec duration_to_timespec(mrb_state* mrb, mrb_value v);
-
-
-/* ----- Internal: timespec ↔ std::chrono::nanoseconds ----------------
+ * Used by the templated from<T> / as<T> below, and exposed for any
+ * extension code that wants to work with the canonical
+ * mrb_chrono::Duration type directly.
  *
- * The bridge that everything else goes through. timespec is POSIX
- * storage; nanoseconds is the working type for std::chrono operations.
- * The conversion is well-defined as long as (tv_sec * 1e9 + tv_nsec)
- * fits int64_t, which covers ±292 years — practical infinity.
+ *   mrb_value dur = mrb_chrono::from_nanoseconds(mrb,
+ *                     mrb_chrono::Duration(500'000'000));
+ *
+ *   mrb_chrono::Duration d = mrb_chrono::stored_nanoseconds(mrb, dur);
+ *
+ * These exist mainly as the substrate the templates dispatch through;
+ * most callers should prefer mrb_chrono::from<T> / mrb_chrono::as<T>
+ * because they don't tie the call site to a particular period.
  */
-namespace detail {
-  inline std::chrono::nanoseconds
-  timespec_to_ns(struct timespec ts) {
-    return std::chrono::seconds(ts.tv_sec) +
-           std::chrono::nanoseconds(ts.tv_nsec);
-  }
+mrb_value from_nanoseconds(mrb_state* mrb, Duration ns);
+Duration  stored_nanoseconds(mrb_state* mrb, mrb_value v);
 
-  inline struct timespec
-  ns_to_timespec(std::chrono::nanoseconds total) {
-    constexpr int64_t NS_PER_SEC = 1'000'000'000;
-    int64_t n = total.count();
-    struct timespec ts;
-    ts.tv_sec  = static_cast<time_t>(n / NS_PER_SEC);
-    ts.tv_nsec = static_cast<long>(n % NS_PER_SEC);
-    /* Normalize: tv_nsec must be in [0, NS_PER_SEC). For negative
-     * total this requires borrowing from tv_sec. */
-    if (ts.tv_nsec < 0) {
-      ts.tv_nsec += NS_PER_SEC;
-      ts.tv_sec  -= 1;
-    }
-    return ts;
-  }
-}
+
+/* ----- POSIX timespec interop ---------------------------------------
+ *
+ * Returns the Duration's value as a `struct timespec`, normalized so
+ * tv_nsec is in [0, 1'000'000'000) — what POSIX syscalls expect.
+ *
+ *   struct timespec ts = mrb_chrono::to_timespec(mrb, dur);
+ *   clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, nullptr);
+ *
+ * On Linux, struct __kernel_timespec (used by io_uring submission
+ * queue entries for timeouts) has the same layout as struct timespec
+ * on 64-bit time_t platforms, so a reinterpret_cast or memcpy is the
+ * usual bridge:
+ *
+ *   struct timespec ts = mrb_chrono::to_timespec(mrb, dur);
+ *   struct __kernel_timespec kts;
+ *   std::memcpy(&kts, &ts, sizeof(kts));   // or reinterpret_cast
+ *   io_uring_prep_timeout(sqe, &kts, 0, 0);
+ *
+ * The reverse direction (timespec → Duration) intentionally has no
+ * dedicated helper. The standard-library one-liner is plenty:
+ *
+ *   mrb_value dur = mrb_chrono::from(mrb,
+ *                     std::chrono::seconds(ts.tv_sec) +
+ *                     std::chrono::nanoseconds(ts.tv_nsec));
+ */
+struct timespec to_timespec(mrb_state* mrb, mrb_value v);
 
 
 /* ----- mrb_chrono::from -----------------------------------------------
@@ -119,18 +132,16 @@ namespace detail {
  *     mrb_value d2 = mrb_chrono::from(mrb, std::chrono::microseconds(uint64_t{1'000'000}));
  *     mrb_value d3 = mrb_chrono::from(mrb, std::chrono::duration<double>(0.5));  // half a second
  *
- * Internally: cast to std::chrono::nanoseconds, store as timespec.
- * Raises RangeError if the input's nanosecond representation would
- * overflow int64_t (basically unreachable for sane time values).
+ * Internally: duration_cast to mrb_chrono::Duration (= nanoseconds),
+ * store. Out-of-range inputs follow std::chrono::duration_cast's
+ * behavior; the working range is ±292 years.
  */
-mrb_value from_timespec(mrb_state* mrb, struct timespec ts);
-
 template <typename ChronoDuration>
 mrb_value from(mrb_state* mrb, ChronoDuration d) {
   static_assert(detail::is_std_chrono_duration_v<ChronoDuration>,
                 "mrb_chrono::from: argument must be a std::chrono::duration");
-  auto total_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(d);
-  return from_timespec(mrb, detail::ns_to_timespec(total_ns));
+  return from_nanoseconds(mrb,
+    std::chrono::duration_cast<Duration>(d));
 }
 
 
@@ -160,8 +171,7 @@ ChronoDuration as(mrb_state* mrb, mrb_value v,
   static_assert(detail::is_std_chrono_duration_v<ChronoDuration>,
                 "mrb_chrono::as: target must be a std::chrono::duration type");
 
-  struct timespec ts = duration_to_timespec(mrb, v);
-  auto stored = detail::timespec_to_ns(ts);
+  Duration stored = stored_nanoseconds(mrb, v);
 
   switch (r) {
     case Rounding::Truncate: return std::chrono::duration_cast<ChronoDuration>(stored);
