@@ -3,6 +3,7 @@ MRuby::Gem::Specification.new('mruby-chrono') do |spec|
   spec.author  = 'Hendrik Beskow'
   spec.summary = 'Duration values for mruby ↔ C/C++ time-API interop'
   spec.add_dependency 'mruby-c-ext-helpers'
+  spec.add_test_dependency 'mruby-rational'
 
   def detect_cxx_std(spec)
     require 'tempfile'

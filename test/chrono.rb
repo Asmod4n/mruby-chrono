@@ -297,3 +297,103 @@ assert('Duration#/ raises RangeError on INT64_MIN / -1') do
   result = 1.s / -1
   assert_equal(-1, result.as(:s))
 end
+
+# ---------- Float receivers on Numeric extensions ----------
+
+assert('Float#s gives a fractional-second Duration') do
+  d = 1.5.s
+  assert_kind_of(Chrono::Duration, d)
+  assert_equal(1_500_000_000, d.as(:ns))
+  assert_equal(1_500,         d.as(:ms))
+end
+
+assert('Float#ms gives a fractional-millisecond Duration') do
+  d = 0.5.ms
+  assert_equal(500,    d.as(:us))
+  assert_equal(500_000, d.as(:ns))
+end
+
+assert('Float#ns truncates to whole nanoseconds (storage limit)') do
+  # 1.5 ns can't be stored — timespec is whole nanoseconds.
+  # duration_cast truncates toward zero.
+  assert_equal(1, 1.5.ns.as(:ns))
+end
+
+assert('Float#h works') do
+  assert_equal(1_800, 0.5.h.as(:s))
+end
+
+assert('Float duration raises RangeError on non-finite values') do
+  assert_raise(RangeError) { (1.0 / 0.0).s }    # +Infinity
+  assert_raise(RangeError) { (0.0 / 0.0).s }    # NaN
+end
+
+assert('Float duration raises RangeError on overflow') do
+  # 1e20 seconds → 1e29 nanoseconds, far past INT64_MAX (~9.2e18).
+  assert_raise(RangeError) { 1.0e20.s }
+end
+
+assert('Float and Integer constructions of the same value compare equal') do
+  assert_equal(500.ms, 0.5.s)
+  assert_equal(1.s, 1000.0.ms)
+end
+
+# ---------- Rational and other Numeric subclasses ----------
+
+assert('Numeric#ms works on Rational') do
+  d = Rational(1, 2).ms
+  assert_kind_of(Chrono::Duration, d)
+  assert_equal(500,    d.as(:us))
+  assert_equal(500_000, d.as(:ns))
+end
+
+assert('Rational with non-terminating decimal — best-effort via to_f') do
+  d = Rational(1, 3).s
+  # 1/3 second as Float → ~0.3333... → 333_333_333 ns ±1 ulp at this scale.
+  ns = d.as(:ns)
+  assert_true((ns - 333_333_333).abs <= 1, "got #{ns} ns")
+end
+
+assert('Chrono::Duration.new accepts Rational') do
+  d = Chrono::Duration.new(Rational(1, 4), :s)
+  assert_equal(250, d.as(:ms))
+end
+
+assert('Chrono::Duration.new(Rational(1,2), :ms) round-trips') do
+  d = Chrono::Duration.new(Rational(1, 2), :ms)
+  assert_equal(500, d.as(:us))
+end
+
+assert('Duration#* with Rational scalar') do
+  d = 1.s * Rational(1, 3)
+  ns = d.as(:ns)
+  assert_true((ns - 333_333_333).abs <= 1, "got #{ns} ns")
+end
+
+assert('Duration#* with Rational(2) doubles the Duration') do
+  assert_equal(2_000_000_000, (1.s * Rational(2)).as(:ns))
+end
+
+assert('Duration#/ with Rational scalar') do
+  # 1.s / Rational(1,2) == 1.s * 2 == 2 seconds
+  assert_equal(2_000_000_000, (1.s / Rational(1, 2)).as(:ns))
+end
+
+assert('Duration#/ with Rational(0) raises ZeroDivisionError') do
+  assert_raise(ZeroDivisionError) { 1.s / Rational(0) }
+end
+
+assert('Duration#* with non-Numeric raises TypeError') do
+  assert_raise(TypeError) { 1.s * "two" }
+  assert_raise(TypeError) { 1.s * :half }
+end
+
+assert('Duration#/ with non-Numeric raises TypeError') do
+  assert_raise(TypeError) { 1.s / "two" }
+end
+
+assert('Numeric#ms on a non-Numeric receiver is undefined') do
+  # Sanity: extensions are scoped to Numeric, not Object.
+  assert_false("500".respond_to?(:ms))
+  assert_false(:ms.respond_to?(:ms))
+end

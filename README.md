@@ -69,27 +69,24 @@ needs it, in whichever shape that library expects.
 ### Ruby surface
 
 ```ruby
-# Construct
-500.ms                              # also .us, .ns, .s, .min, .h
+# Construct — any Numeric works (Integer, Float, Rational, Bigint, ...)
+500.ms                              # Integer; also .us, .ns, .s, .min, .h
                                     # .days and .weeks on C++20+ builds
+0.5.s                               # Float — fractional seconds
+Rational(1, 3).s                    # Rational — coerced via to_f
 Chrono::Duration.new(500, :ms)      # explicit form
+Chrono::Duration.new(Rational(1, 2), :ms)
 
 # Convert out
 dur.as(:microseconds)               # Integer; truncates by default
 dur.as(:microseconds, :round)       # Integer with a rounding policy
 dur.as_f(:seconds)                  # Float — for IO.select et al.
 
-# Arithmetic
+# Arithmetic — scalars may be any Numeric
 dur + other                         # Duration + Duration
 dur - other                         # Duration - Duration
-dur * 2                             # Duration * scalar
-dur / 4                             # Duration / scalar
-
-# Comparison (Comparable mixed in off the <=> implementation)
-dur == other                        # value equality
-dur < other                         # also <=, >, >=, <=>
-dur.between?(min_dur, max_dur)
-dur.clamp(min_dur, max_dur)
+dur * 2                             # Duration * Numeric  (Integer/Float/Rational/...)
+dur / Rational(1, 4)                # Duration / Numeric
 ```
 
 Accepted unit Symbols, long and short:
@@ -114,6 +111,18 @@ Symbol name:
 | `:floor`     | `std::chrono::floor<Target>`           |
 | `:ceil`      | `std::chrono::ceil<Target>`            |
 | `:round`     | `std::chrono::round<Target>` (banker's)|
+
+### Numeric coercion
+
+Construction (`Chrono::Duration.new`, `Numeric#ms` etc.) and scalar
+arithmetic (`*`, `/`) accept any `Numeric`. Integer and Bigint go
+through an int64 fast path with overflow checking. Everything else —
+Float, Rational, user-defined Numeric subclasses — is coerced via
+`to_f`, so the result is a nearest-IEEE-754-double approximation
+truncated to int64 nanoseconds. For terminating fractions this is
+exact (`Rational(1, 2).ms == 500.us`); for repeating ones it's within
+one nanosecond of the mathematical value (`Rational(1, 3).s` →
+333,333,333 ns).
 
 ### C++ extension surface
 

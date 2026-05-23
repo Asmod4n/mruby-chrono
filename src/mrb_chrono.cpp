@@ -25,6 +25,13 @@
  *   t.duration    # same span as a Chrono::Duration
  *   t.reset       # restart from now
  *
+ * Numeric handling: Integer / Bigint take a fast int64 path with
+ * overflow checking. Float / Rational / Complex / user Numeric
+ * subclasses go through mrb_as_float (= mrb_ensure_float_type), which
+ * uses the native mruby conversion table — mrb_rational_to_f for
+ * Rational, mrb_bint_as_float for Bigint, etc. — without any VM
+ * funcall dispatch.
+ *
  * Duration storage is mrb_chrono::Duration (= std::chrono::nanoseconds)
  * in the mruby data slot, bound via mruby-c-ext-helpers'
  * MRB_CPP_DEFINE_TYPE. The math is std::chrono throughout — no
@@ -359,7 +366,13 @@ load_ns(mrb_state* mrb, mrb_value self)
   return *mrb_cpp_get<mrb_chrono::Duration>(mrb, self);
 }
 
-/* Chrono::Duration.new(count, :unit). count may be Integer or Float. */
+/* Chrono::Duration.new(count, :unit). count is any Numeric.
+ *
+ * Integer/Bigint take the int64 fast path. Anything else goes through
+ * mrb_as_float, which natively handles Float, Rational, Complex, and
+ * Bigint via mruby's conversion table — and raises TypeError on
+ * non-Numeric input ("X cannot be converted to Float"), so we don't
+ * need a separate type check. */
 mrb_value
 duration_init(mrb_state* mrb, mrb_value self)
 {
@@ -374,14 +387,16 @@ duration_init(mrb_state* mrb, mrb_value self)
     ns = ns_from_count_unit(to_i64(mrb, count_v), unit);
   }
 #ifndef MRB_NO_FLOAT
-  else if (mrb_float_p(count_v)) {
-    ns = ns_from_float_count_unit(mrb_float(count_v), unit);
+  else {
+    ns = ns_from_float_count_unit(mrb_as_float(mrb, count_v), unit);
   }
-#endif
+#else
   else {
     mrb_raise(mrb, E_TYPE_ERROR,
-              "Chrono::Duration.new: count must be Integer or Float");
+              "Chrono::Duration.new: count must be Integer "
+              "in MRB_NO_FLOAT build");
   }
+#endif
 
   *mrb_cpp_new<mrb_chrono::Duration>(mrb, self) = ns;
   return self;
@@ -450,7 +465,11 @@ duration_minus(mrb_state* mrb, mrb_value self)
                       load_ns(mrb, self) - load_ns(mrb, other));
 }
 
-/* dur * scalar */
+/* dur * scalar
+ *
+ * Integer fast path uses exact int64 arithmetic with overflow
+ * detection. Float/Rational/etc. go through mrb_as_float and a
+ * double multiply; the result is range-checked back into int64 ns. */
 mrb_value
 duration_mul(mrb_state* mrb, mrb_value self)
 {
@@ -466,8 +485,9 @@ duration_mul(mrb_state* mrb, mrb_value self)
     }
   }
 #ifndef MRB_NO_FLOAT
-  else if (mrb_float_p(scalar)) {
-    double d = static_cast<double>(ns) * mrb_float(scalar);
+  else {
+    /* mrb_as_float raises TypeError if scalar isn't a Numeric. */
+    double d = static_cast<double>(ns) * mrb_as_float(mrb, scalar);
     if (!std::isfinite(d) ||
         d > static_cast<double>(INT64_MAX) ||
         d < static_cast<double>(INT64_MIN)) {
@@ -477,10 +497,13 @@ duration_mul(mrb_state* mrb, mrb_value self)
     }
     product = static_cast<int64_t>(d);
   }
-#endif
+#else
   else {
-    mrb_raise(mrb, E_TYPE_ERROR, "Duration#*: expected Integer or Float scalar");
+    mrb_raise(mrb, E_TYPE_ERROR,
+              "Duration#*: only Integer scalar supported "
+              "in MRB_NO_FLOAT build");
   }
+#endif
   return new_duration(mrb, duration_class(mrb),
                       mrb_chrono::Duration(product));
 }
@@ -506,8 +529,8 @@ duration_div(mrb_state* mrb, mrb_value self)
     quotient = ns / d;
   }
 #ifndef MRB_NO_FLOAT
-  else if (mrb_float_p(scalar)) {
-    auto d = mrb_float(scalar);
+  else {
+    double d = mrb_as_float(mrb, scalar);
     if (d == 0.0) mrb_raise(mrb, E_ZERODIV_ERROR, "Duration#/: divided by 0.0");
     double r = static_cast<double>(ns) / d;
     if (!std::isfinite(r) ||
@@ -519,10 +542,13 @@ duration_div(mrb_state* mrb, mrb_value self)
     }
     quotient = static_cast<int64_t>(r);
   }
-#endif
+#else
   else {
-    mrb_raise(mrb, E_TYPE_ERROR, "Duration#/: expected Integer or Float scalar");
+    mrb_raise(mrb, E_TYPE_ERROR,
+              "Duration#/: only Integer scalar supported "
+              "in MRB_NO_FLOAT build");
   }
+#endif
   return new_duration(mrb, duration_class(mrb),
                       mrb_chrono::Duration(quotient));
 }
@@ -556,34 +582,83 @@ duration_cmp(mrb_state* mrb, mrb_value self)
 
 /* dur.inspect — "#<Chrono::Duration 500000000ns>"
  *
- * snprintf instead of mrb_format because mrb_format's %i reads
- * mrb_int from varargs, which truncates a wider int64 on smaller
- * mrb_int builds. snprintf with %lld is correct everywhere. */
+ * Box the int64 nanosecond count via mrb_convert_number, which picks
+ * Fixnum / mrb_int Integer / Bigint based on the build matrix, then
+ * let mrb_format's %v call to_s on it. No varargs-width concerns —
+ * the number is already an mrb_value by the time the formatter sees
+ * it — and no manual buffer management. */
 mrb_value
 duration_inspect(mrb_state* mrb, mrb_value self)
 {
   int64_t ns = load_ns(mrb, self).count();
-  char buf[64];
-  int n = snprintf(buf, sizeof(buf), "#<Chrono::Duration %lldns>",
-                   static_cast<long long>(ns));
-  if (n < 0) n = 0;
-  if (static_cast<size_t>(n) >= sizeof(buf)) n = sizeof(buf) - 1;
-  return mrb_str_new(mrb, buf, n);
+  return mrb_format(mrb, "#<Chrono::Duration %vns>",
+                    mrb_convert_number(mrb, ns));
 }
 
 
-/* ----- Numeric extensions: 5.ms, 200.us, ... ----------------------- */
+/* ----- Numeric extensions: 5.ms, 1.5.s, Rational(1,3).s, 200.us ----
+ *
+ * Defined on Numeric so Integer, Float, Bigint, Rational, and any
+ * user-defined Numeric subclass all work. Integer/Bigint take the
+ * int64 fast path; everything else goes through mrb_as_float, which
+ * dispatches natively (mrb_rational_to_f for Rational, etc.) — no VM
+ * funcall.
+ *
+ * Float's period determines what the count means: 1.5.ms is 1.5
+ * milliseconds (1_500_000 ns), not 1.5 nanoseconds. ChronoType's
+ * ::period carries that information into the FloatDur template
+ * instantiation.
+ */
+template <typename ChronoType>
+mrb_value
+numeric_to_duration(mrb_state* mrb, mrb_value self)
+{
+  std::chrono::nanoseconds total_ns;
 
-#define DEFINE_NUMERIC_TAG(name, ChronoType)                                   \
-  mrb_value                                                                    \
-  numeric_##name(mrb_state* mrb, mrb_value self) {                             \
-    if (!is_integerish(self)) {                                                \
-      mrb_raise(mrb, E_TYPE_ERROR,                                             \
-                "Numeric#" #name ": only Integer supported");                  \
-    }                                                                          \
-    auto total_ns = std::chrono::duration_cast<mrb_chrono::Duration>(          \
-                      ChronoType(to_i64(mrb, self)));                          \
-    return new_duration(mrb, duration_class(mrb), total_ns);                   \
+  if (is_integerish(self)) {
+    total_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                 ChronoType(to_i64(mrb, self)));
+  }
+#ifndef MRB_NO_FLOAT
+  else {
+    /* Float, Rational, Complex, or any other Numeric subclass.
+     * Receiver is guaranteed Numeric since the method is on Numeric,
+     * so mrb_as_float won't reject the type — it converts via the
+     * appropriate native path. */
+    double d = mrb_as_float(mrb, self);
+    if (!std::isfinite(d)) {
+      mrb_raise(mrb, E_RANGE_ERROR,
+                "Numeric duration constructor: non-finite Float");
+    }
+    using FloatDur = std::chrono::duration<double, typename ChronoType::period>;
+    /* Range-check against int64 ns before the cast — chrono's
+     * duration_cast on out-of-range float is UB. */
+    double ns_value =
+      std::chrono::duration_cast<std::chrono::duration<double, std::nano>>(
+        FloatDur(d)).count();
+    if (ns_value > static_cast<double>(INT64_MAX) ||
+        ns_value < static_cast<double>(INT64_MIN)) {
+      mrb_raise(mrb, E_RANGE_ERROR,
+                "Numeric duration constructor: result out of int64 "
+                "nanosecond range");
+    }
+    total_ns = std::chrono::nanoseconds(static_cast<int64_t>(ns_value));
+  }
+#else
+  else {
+    mrb_raise(mrb, E_TYPE_ERROR,
+              "Numeric duration constructor: only Integer supported "
+              "in MRB_NO_FLOAT build");
+  }
+#endif
+
+  return new_duration(mrb, duration_class(mrb), total_ns);
+}
+
+#define DEFINE_NUMERIC_TAG(name, ChronoType)                          \
+  mrb_value                                                           \
+  numeric_##name(mrb_state* mrb, mrb_value self) {                    \
+    return numeric_to_duration<ChronoType>(mrb, self);                \
   }
 
 DEFINE_NUMERIC_TAG(nanoseconds,  std::chrono::nanoseconds)
@@ -598,7 +673,6 @@ DEFINE_NUMERIC_TAG(weeks,        std::chrono::weeks)
 #endif
 
 #undef DEFINE_NUMERIC_TAG
-
 } /* anonymous namespace */
 
 
@@ -787,36 +861,36 @@ mrb_mruby_chrono_gem_init(mrb_state* mrb)
   mrb_define_method_id(mrb, dur_cls, MRB_SYM(to_s),
                        duration_inspect, MRB_ARGS_NONE());
 
-  /* Numeric extensions: 5.ms, 200.us, 2.h, etc. */
-  struct RClass* integer = mrb->integer_class;
-  mrb_define_method_id(mrb, integer, MRB_SYM(nanoseconds),
+  /* Numeric extensions: 5.ms, 1.5.s, Rational(1,3).s, 200.us, etc. */
+  struct RClass* numeric = mrb_class_get_id(mrb, MRB_SYM(Numeric));
+  mrb_define_method_id(mrb, numeric, MRB_SYM(nanoseconds),
                        numeric_nanoseconds,  MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(ns),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(ns),
                        numeric_nanoseconds,  MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(microseconds),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(microseconds),
                        numeric_microseconds, MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(us),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(us),
                        numeric_microseconds, MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(milliseconds),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(milliseconds),
                        numeric_milliseconds, MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(ms),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(ms),
                        numeric_milliseconds, MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(seconds),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(seconds),
                        numeric_seconds,      MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(s),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(s),
                        numeric_seconds,      MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(minutes),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(minutes),
                        numeric_minutes,      MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(min),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(min),
                        numeric_minutes,      MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(hours),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(hours),
                        numeric_hours,        MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(h),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(h),
                        numeric_hours,        MRB_ARGS_NONE());
 #if defined(__cpp_lib_chrono) && __cpp_lib_chrono >= 201907L
-  mrb_define_method_id(mrb, integer, MRB_SYM(days),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(days),
                        numeric_days,         MRB_ARGS_NONE());
-  mrb_define_method_id(mrb, integer, MRB_SYM(weeks),
+  mrb_define_method_id(mrb, numeric, MRB_SYM(weeks),
                        numeric_weeks,        MRB_ARGS_NONE());
 #endif
 
