@@ -206,14 +206,6 @@ methods on Steady and Timer, the `Chrono::Duration` class, the
 `mrb_chrono::as` C++ extension surface are additive — nothing existing
 breaks.
 
-## Design notes
-
-For the architectural picture — why Duration storage is `struct
-timespec`, why the math is `std::chrono::duration_cast`, what's
-deliberately absent (no `.unit` accessor, no Converter/Importer
-classes, no gem-defined Unit enum, no `System.duration`) — see
-[`DESIGN.md`](DESIGN.md).
-
 ## Dependencies
 
 - [mruby-c-ext-helpers](https://github.com/Hendrik-2/mruby-c-ext-helpers)
