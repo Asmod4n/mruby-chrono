@@ -12,6 +12,7 @@
 #include <mruby/class.h>
 #include <mruby/numeric.h>
 #include <mruby/chrono.h>
+#include <mruby/num_helpers.h>
 
  /* ------------------------------------------------------------------ */
  /*  mrb_chrono_from wrappers                                           */
@@ -41,7 +42,7 @@ ctest_to_int32(mrb_state* mrb, mrb_value self)
   mrb_chrono_convert(mrb, v,
     MRB_CHRONO_OUT_INT32, (mrb_chrono_dur_type)dur, (mrb_chrono_rounding)rnd,
     &out, sizeof out);
-  return mrb_int_value(mrb, (mrb_int)out);
+  return mrb_convert_int32(mrb, out);
 }
 
 /* ChronoCTest.to_int64(value, dur_type, rounding) -> Integer */
@@ -54,7 +55,7 @@ ctest_to_int64(mrb_state* mrb, mrb_value self)
   mrb_chrono_convert(mrb, v,
     MRB_CHRONO_OUT_INT64, (mrb_chrono_dur_type)dur, (mrb_chrono_rounding)rnd,
     &out, sizeof out);
-  return mrb_int_value(mrb, (mrb_int)out);
+  return mrb_convert_int64(mrb, out);
 }
 
 /* ChronoCTest.to_long(value, dur_type, rounding) -> Integer */
@@ -67,7 +68,7 @@ ctest_to_long(mrb_state* mrb, mrb_value self)
   mrb_chrono_convert(mrb, v,
     MRB_CHRONO_OUT_LONG, (mrb_chrono_dur_type)dur, (mrb_chrono_rounding)rnd,
     &out, sizeof out);
-  return mrb_int_value(mrb, (mrb_int)out);
+  return mrb_convert_long(mrb, out);
 }
 
 /* ChronoCTest.to_double(value, dur_type, rounding) -> Float */
@@ -80,7 +81,7 @@ ctest_to_double(mrb_state* mrb, mrb_value self)
   mrb_chrono_convert(mrb, v,
     MRB_CHRONO_OUT_DOUBLE, (mrb_chrono_dur_type)dur, (mrb_chrono_rounding)rnd,
     &out, sizeof out);
-  return mrb_float_value(mrb, (mrb_float)out);
+  return mrb_convert_double(mrb, out);
 }
 
 /* ChronoCTest.to_timespec(value, dur_type, rounding) -> [tv_sec, tv_nsec] */

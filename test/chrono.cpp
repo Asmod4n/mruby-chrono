@@ -10,6 +10,7 @@
 #include <mruby/class.h>
 #include <mruby/numeric.h>
 #include <mruby/chrono.hpp>
+#include <mruby/num_helpers.hpp>
 #include <chrono>
 
  /* ------------------------------------------------------------------ */
@@ -43,7 +44,7 @@ cpptest_steady_now(mrb_state* mrb, mrb_value)
 #define DEF_AS(suffix, fn, ChronoType) \
   static mrb_value cpptest_as_##suffix(mrb_state* mrb, mrb_value) { \
     mrb_value v; mrb_get_args(mrb, "o", &v);                         \
-    return mrb_int_value(mrb, (mrb_int)                              \
+    return mrb_convert_number(mrb,                                   \
       mrb_chrono::fn<ChronoType>(mrb, v).count());                   \
   }
 
