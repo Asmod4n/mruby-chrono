@@ -37,23 +37,12 @@
 #include <time.h>   /* struct timespec — C11, POSIX, VS2015+ */
 
 #ifdef _WIN32
- /*
-  * Define struct timeval directly rather than including ws2def.h.
-  *
-  * ws2def.h is not self-contained — it pulls in inaddr.h which needs
-  * windef.h and basetsd.h to already be included for FAR, ADDRESS_FAMILY
-  * etc. Including it without Windows.h first causes a cascade of errors.
-  *
-  * The struct layout is fixed by the Windows SDK (both fields are long)
-  * and hasn't changed. _TIMEVAL_DEFINED matches the SDK's own sentinel
-  * so there's no conflict if the caller includes winsock2.h afterward.
-  */
-#  ifndef _TIMEVAL_DEFINED
+#  if !defined(_TIMEVAL_DEFINED) && !defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_)
 struct timeval { long tv_sec; long tv_usec; };
 #    define _TIMEVAL_DEFINED
 #  endif
 #else
-#  include <sys/time.h>   /* struct timeval */
+#  include <sys/time.h>
 #endif
 
  /* ----- Output type ------------------------------------------------- */
