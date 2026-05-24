@@ -38,3 +38,4 @@ build/
 .rvmrc
 /.cache/
 compile_commands.json
+/.vs/
