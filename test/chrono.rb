@@ -358,3 +358,42 @@ end
 assert("ChronoCppTest.as_us_round: 3500ns -> 4us (half-to-even)") do
   assert_equal(4, ChronoCppTest.as_us_round(3500.ns))
 end
+
+# ------------------------------------------------------------------ #
+#  C API — time_t output                                              #
+# ------------------------------------------------------------------ #
+
+assert('ChronoCTest.to_time_t: 1.s -> 1') do
+  assert_equal(1, ChronoCTest.to_time_t(1.s, ChronoCTest::DUR_SECONDS, ChronoCTest::TRUNC))
+end
+
+assert('ChronoCTest.to_time_t: 1500ms in seconds -> 1 (TRUNC)') do
+  assert_equal(1, ChronoCTest.to_time_t(1500.ms, ChronoCTest::DUR_SECONDS, ChronoCTest::TRUNC))
+end
+
+assert('ChronoCTest.to_time_t: 1500ms in seconds -> 2 (CEIL)') do
+  assert_equal(2, ChronoCTest.to_time_t(1500.ms, ChronoCTest::DUR_SECONDS, ChronoCTest::CEIL))
+end
+
+assert('ChronoCTest.to_time_t: 1500ms in seconds -> 1 (FLOOR)') do
+  assert_equal(1, ChronoCTest.to_time_t(1500.ms, ChronoCTest::DUR_SECONDS, ChronoCTest::FLOOR))
+end
+
+assert('ChronoCTest.to_time_t: 1.h -> 3600') do
+  assert_equal(3600, ChronoCTest.to_time_t(1.h, ChronoCTest::DUR_SECONDS, ChronoCTest::TRUNC))
+end
+
+assert('ChronoCTest.to_time_t: negative (pre-epoch)') do
+  assert_equal(-3600, ChronoCTest.to_time_t(-1.h, ChronoCTest::DUR_SECONDS, ChronoCTest::TRUNC))
+end
+
+assert('ChronoCTest.to_time_t: Chrono::System.now is past 2020') do
+  t = ChronoCTest.to_time_t(Chrono::System.now, ChronoCTest::DUR_SECONDS, ChronoCTest::TRUNC)
+  assert_kind_of(Integer, t)
+  assert_true(t > 1_577_000_000, "system clock should be past 2020 (got #{t})")
+end
+
+assert('ChronoCTest.to_time_t: out of range raises RangeError') do
+  # 1e30 seconds exceeds int64 (~9.2e18) and therefore any time_t width
+  assert_raise(RangeError) { ChronoCTest.to_time_t(1.0e30.s, ChronoCTest::DUR_SECONDS, ChronoCTest::TRUNC) }
+end

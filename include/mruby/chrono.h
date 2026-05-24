@@ -81,6 +81,7 @@ typedef enum mrb_chrono_out_type {
   /* Struct types */
   MRB_CHRONO_OUT_TIMESPEC = 16,  /* struct timespec — nanosecond resolution */
   MRB_CHRONO_OUT_TIMEVAL = 17,  /* struct timeval  — microsecond resolution */
+	MRB_CHRONO_OUT_TIME_T = 18,  /* time_t (seconds, for legacy APIs) */
 } mrb_chrono_out_type;
 
 /* ----- Duration (unit) type ---------------------------------------- */

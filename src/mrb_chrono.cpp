@@ -256,6 +256,7 @@ namespace {
     case MRB_CHRONO_OUT_DOUBLE:   return sizeof(double);
     case MRB_CHRONO_OUT_TIMESPEC: return sizeof(struct timespec);
     case MRB_CHRONO_OUT_TIMEVAL:  return sizeof(struct timeval);
+    case MRB_CHRONO_OUT_TIME_T:   return sizeof(time_t);
     }
     return 0; /* unreachable */
   }
@@ -430,6 +431,7 @@ mrb_chrono_convert(mrb_state* mrb,
     normalise_timeval(tv);
     break;
   }
+  case MRB_CHRONO_OUT_TIME_T: write_int<time_t>(mrb, out, ticks, rounding); break;
   }
 }
 

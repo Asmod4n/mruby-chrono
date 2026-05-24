@@ -116,6 +116,21 @@ ctest_to_timeval(mrb_state* mrb, mrb_value self)
   return mrb_ary_new_from_values(mrb, 2, pair);
 }
 
+/* ChronoCTest.to_time_t(value, dur_type, rounding) -> Integer */
+static mrb_value
+ctest_to_time_t(mrb_state* mrb, mrb_value self)
+{
+  mrb_value v; mrb_int dur, rnd;
+  mrb_get_args(mrb, "oii", &v, &dur, &rnd);
+  time_t out;
+  mrb_chrono_convert(mrb, v,
+    MRB_CHRONO_OUT_TIME_T, (mrb_chrono_dur_type)dur, (mrb_chrono_rounding)rnd,
+    &out, sizeof out);
+  /* Cast through int64_t so 32-bit time_t builds promote cleanly and
+   * 64-bit values that exceed mrb_int range on narrow builds become Bigint. */
+  return mrb_convert_int64(mrb, (int64_t)out);
+}
+
 /* ------------------------------------------------------------------ */
 /*  gem_test entry point                                               */
 /* ------------------------------------------------------------------ */
@@ -149,4 +164,5 @@ mrb_mruby_chrono_gem_test(mrb_state* mrb)
   mrb_define_module_function(mrb, mod, "to_double", ctest_to_double, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, mod, "to_timespec", ctest_to_timespec, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, mod, "to_timeval", ctest_to_timeval, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, mod, "to_time_t", ctest_to_time_t, MRB_ARGS_REQ(3));
 }
