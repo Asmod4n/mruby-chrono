@@ -21,12 +21,14 @@ never heap-allocated. Standard Float arithmetic applies directly.
 // std::chrono duration -> Float seconds mrb_value
 mrb_value v = mrb_chrono::from(mrb, std::chrono::milliseconds(500)); // 0.5
 
-// Float seconds mrb_value -> any std::chrono duration
-auto ms = mrb_chrono::as<std::chrono::milliseconds>(mrb, v); // std::chrono::milliseconds(500)
-auto us = mrb_chrono::as<std::chrono::microseconds>(mrb, v); // std::chrono::microseconds(500000)
+// Float seconds mrb_value -> any std::chrono duration (mirrors std::chrono naming)
+auto ms = mrb_chrono::as<std::chrono::milliseconds>(mrb, v);    // truncate (duration_cast)
+auto ms = mrb_chrono::floor<std::chrono::milliseconds>(mrb, v); // toward -∞
+auto ms = mrb_chrono::ceil<std::chrono::milliseconds>(mrb, v);  // toward +∞
+auto ms = mrb_chrono::round<std::chrono::milliseconds>(mrb, v); // half-to-even
 
 // Use .count() to get the raw integer for C APIs
-int timeout_ms = (int)ms.count(); // 500
+int timeout_ms = (int)ms.count();
 ```
 
 ## C API

@@ -1,9 +1,9 @@
 /*
  * test/chrono_cpptest.cpp
  *
- * Registers ChronoCppTest module methods that exercise the C++ API
- * (mrb_chrono::from, mrb_chrono::as). Called from mrb_mruby_chrono_gem_test
- * in chrono_ctest.c. Assertions live in test/chrono.rb.
+ * Registers ChronoCppTest module methods exercising the C++ API.
+ * Called from mrb_mruby_chrono_gem_test in chrono_ctest.c.
+ * Assertions live in test/chrono.rb.
  */
 
 #include <mruby.h>
@@ -13,50 +13,22 @@
 #include <chrono>
 
  /* ------------------------------------------------------------------ */
- /*  mrb_chrono::from — std::chrono::duration -> Float seconds          */
+ /*  mrb_chrono::from                                                   */
  /* ------------------------------------------------------------------ */
 
- /* ChronoCppTest.from_ms(n) -> Float */
-static mrb_value
-cpptest_from_ms(mrb_state* mrb, mrb_value)
-{
-  mrb_int n; mrb_get_args(mrb, "i", &n);
-  return mrb_chrono::from(mrb, std::chrono::milliseconds(n));
-}
+#define DEF_FROM(name, ChronoType) \
+  static mrb_value cpptest_from_##name(mrb_state* mrb, mrb_value) { \
+    mrb_int n; mrb_get_args(mrb, "i", &n);                           \
+    return mrb_chrono::from(mrb, ChronoType(n));                     \
+  }
 
-/* ChronoCppTest.from_us(n) -> Float */
-static mrb_value
-cpptest_from_us(mrb_state* mrb, mrb_value)
-{
-  mrb_int n; mrb_get_args(mrb, "i", &n);
-  return mrb_chrono::from(mrb, std::chrono::microseconds(n));
-}
+DEF_FROM(ms, std::chrono::milliseconds)
+DEF_FROM(us, std::chrono::microseconds)
+DEF_FROM(ns, std::chrono::nanoseconds)
+DEF_FROM(s, std::chrono::seconds)
+DEF_FROM(h, std::chrono::hours)
+#undef DEF_FROM
 
-/* ChronoCppTest.from_ns(n) -> Float */
-static mrb_value
-cpptest_from_ns(mrb_state* mrb, mrb_value)
-{
-  mrb_int n; mrb_get_args(mrb, "i", &n);
-  return mrb_chrono::from(mrb, std::chrono::nanoseconds(n));
-}
-
-/* ChronoCppTest.from_s(n) -> Float */
-static mrb_value
-cpptest_from_s(mrb_state* mrb, mrb_value)
-{
-  mrb_int n; mrb_get_args(mrb, "i", &n);
-  return mrb_chrono::from(mrb, std::chrono::seconds(n));
-}
-
-/* ChronoCppTest.from_h(n) -> Float */
-static mrb_value
-cpptest_from_h(mrb_state* mrb, mrb_value)
-{
-  mrb_int n; mrb_get_args(mrb, "i", &n);
-  return mrb_chrono::from(mrb, std::chrono::hours(n));
-}
-
-/* ChronoCppTest.steady_now -> Float (just checks it's positive) */
 static mrb_value
 cpptest_steady_now(mrb_state* mrb, mrb_value)
 {
@@ -65,47 +37,29 @@ cpptest_steady_now(mrb_state* mrb, mrb_value)
 }
 
 /* ------------------------------------------------------------------ */
-/*  mrb_chrono::as — Float seconds -> duration count as Integer        */
+/*  mrb_chrono::as / floor / ceil / round                              */
 /* ------------------------------------------------------------------ */
 
-/* ChronoCppTest.as_ms(v) -> Integer */
-static mrb_value
-cpptest_as_ms(mrb_state* mrb, mrb_value)
-{
-  mrb_value v; mrb_get_args(mrb, "o", &v);
-  return mrb_int_value(mrb, (mrb_int)
-    mrb_chrono::as<std::chrono::milliseconds>(mrb, v).count());
-}
+#define DEF_AS(suffix, fn, ChronoType) \
+  static mrb_value cpptest_as_##suffix(mrb_state* mrb, mrb_value) { \
+    mrb_value v; mrb_get_args(mrb, "o", &v);                         \
+    return mrb_int_value(mrb, (mrb_int)                              \
+      mrb_chrono::fn<ChronoType>(mrb, v).count());                   \
+  }
 
-/* ChronoCppTest.as_us(v) -> Integer */
-static mrb_value
-cpptest_as_us(mrb_state* mrb, mrb_value)
-{
-  mrb_value v; mrb_get_args(mrb, "o", &v);
-  return mrb_int_value(mrb, (mrb_int)
-    mrb_chrono::as<std::chrono::microseconds>(mrb, v).count());
-}
-
-/* ChronoCppTest.as_ns(v) -> Integer */
-static mrb_value
-cpptest_as_ns(mrb_state* mrb, mrb_value)
-{
-  mrb_value v; mrb_get_args(mrb, "o", &v);
-  return mrb_int_value(mrb, (mrb_int)
-    mrb_chrono::as<std::chrono::nanoseconds>(mrb, v).count());
-}
-
-/* ChronoCppTest.as_h(v) -> Integer */
-static mrb_value
-cpptest_as_h(mrb_state* mrb, mrb_value)
-{
-  mrb_value v; mrb_get_args(mrb, "o", &v);
-  return mrb_int_value(mrb, (mrb_int)
-    mrb_chrono::as<std::chrono::hours>(mrb, v).count());
-}
+DEF_AS(ms, as, std::chrono::milliseconds)
+DEF_AS(us, as, std::chrono::microseconds)
+DEF_AS(ns, as, std::chrono::nanoseconds)
+DEF_AS(h, as, std::chrono::hours)
+DEF_AS(ms_floor, floor, std::chrono::milliseconds)
+DEF_AS(us_floor, floor, std::chrono::microseconds)
+DEF_AS(ms_ceil, ceil, std::chrono::milliseconds)
+DEF_AS(us_ceil, ceil, std::chrono::microseconds)
+DEF_AS(us_round, round, std::chrono::microseconds)
+#undef DEF_AS
 
 /* ------------------------------------------------------------------ */
-/*  Registration — called from mrb_mruby_chrono_gem_test in .c file   */
+/*  Registration                                                       */
 /* ------------------------------------------------------------------ */
 
 MRB_BEGIN_DECL
@@ -125,6 +79,11 @@ mrb_chrono_register_cpp_tests(mrb_state* mrb)
   mrb_define_module_function(mrb, mod, "as_us", cpptest_as_us, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mod, "as_ns", cpptest_as_ns, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mod, "as_h", cpptest_as_h, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod, "as_ms_floor", cpptest_as_ms_floor, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod, "as_us_floor", cpptest_as_us_floor, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod, "as_ms_ceil", cpptest_as_ms_ceil, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod, "as_us_ceil", cpptest_as_us_ceil, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod, "as_us_round", cpptest_as_us_round, MRB_ARGS_REQ(1));
 }
 
 MRB_END_DECL

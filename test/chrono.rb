@@ -334,3 +334,27 @@ assert('ChronoCppTest: Ruby unit methods feed directly into as_ms') do
   assert_equal(500, ChronoCppTest.as_ms(500.ms))
   assert_equal(1000, ChronoCppTest.as_ms(1.s))
 end
+
+assert('ChronoCppTest.as_ms_floor: 1.5ms -> 1ms') do
+  assert_equal(1, ChronoCppTest.as_ms_floor(1.5.ms))
+end
+
+assert('ChronoCppTest.as_ms_ceil: 1.5ms -> 2ms') do
+  assert_equal(2, ChronoCppTest.as_ms_ceil(1.5.ms))
+end
+
+assert('ChronoCppTest.as_us_floor: 1500ns -> 1us') do
+  assert_equal(1, ChronoCppTest.as_us_floor(1500.ns))
+end
+
+assert('ChronoCppTest.as_us_ceil: 1500ns -> 2us') do
+  assert_equal(2, ChronoCppTest.as_us_ceil(1500.ns))
+end
+
+assert("ChronoCppTest.as_us_round: 2500ns -> 2us (half-to-even)") do
+  assert_equal(2, ChronoCppTest.as_us_round(2500.ns))
+end
+
+assert("ChronoCppTest.as_us_round: 3500ns -> 4us (half-to-even)") do
+  assert_equal(4, ChronoCppTest.as_us_round(3500.ns))
+end
