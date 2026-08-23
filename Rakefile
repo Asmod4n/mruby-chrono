@@ -9,6 +9,14 @@ file :mruby do
   end
 end
 
+desc "compile binary"
+task :compile => :mruby do
+  Dir.chdir("mruby") do
+    ENV["MRUBY_CONFIG"] = MRUBY_CONFIG_PATH
+    sh "rake all"
+  end
+end
+
 desc "test"
 task :test => :mruby do
   Dir.chdir("mruby") do
