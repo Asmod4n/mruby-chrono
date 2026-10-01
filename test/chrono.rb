@@ -272,6 +272,11 @@ assert('ChronoCppTest.from_ms: 500 -> 0.5') do
   assert_kind_of(Float, ChronoCppTest.from_ms(500))
 end
 
+assert('cpp_to_mrb_value turns a duration into Float seconds') do
+  assert_float(0.5, ChronoCppTest.cpp_to_mrb_value_ms(500))
+  assert_kind_of(Float, ChronoCppTest.cpp_to_mrb_value_ms(500))
+end
+
 assert('ChronoCppTest.from_us: 1 -> 1e-6') do
   assert_float(1e-6, ChronoCppTest.from_us(1))
 end

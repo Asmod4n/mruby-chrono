@@ -11,6 +11,7 @@
 #include <mruby/numeric.h>
 #include <mruby/chrono.hpp>
 #include <mruby/num_helpers.hpp>
+#include <mruby/cpp_to_mrb_value.hpp>
 #include <chrono>
 
  /* ------------------------------------------------------------------ */
@@ -29,6 +30,16 @@ DEF_FROM(ns, std::chrono::nanoseconds)
 DEF_FROM(s, std::chrono::seconds)
 DEF_FROM(h, std::chrono::hours)
 #undef DEF_FROM
+
+/* cpp_to_mrb_value finds chrono.hpp through __has_include and turns a
+ * duration into Float seconds, as mrb_chrono::from does. */
+static mrb_value
+cpptest_cpp_to_mrb_value_ms(mrb_state* mrb, mrb_value)
+{
+  mrb_int n;
+  mrb_get_args(mrb, "i", &n);
+  return cpp_to_mrb_value(mrb, std::chrono::milliseconds(n));
+}
 
 static mrb_value
 cpptest_steady_now(mrb_state* mrb, mrb_value)
@@ -75,6 +86,7 @@ mrb_chrono_register_cpp_tests(mrb_state* mrb)
   mrb_define_module_function(mrb, mod, "from_ns", cpptest_from_ns, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mod, "from_s", cpptest_from_s, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mod, "from_h", cpptest_from_h, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod, "cpp_to_mrb_value_ms", cpptest_cpp_to_mrb_value_ms, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mod, "steady_now", cpptest_steady_now, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, mod, "as_ms", cpptest_as_ms, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mod, "as_us", cpptest_as_us, MRB_ARGS_REQ(1));
